@@ -1,0 +1,21 @@
+
+menu "Sender Configuration"
+    choice DATA_TYPE
+        prompt "Choose Between Fake and Real Data"
+        default USE_REAL_DATA
+        help
+            Select whether or not you want to use data from the lap timers, or synthetic data for testing purposes
+
+        config USE_REAL_DATA
+            bool "Real Data"
+            help
+                Use real data gathered from RTC and DS3231 sensor
+
+        config USE_FAKE_DATA
+            bool "Fake Data"
+            help
+                Use fake data, bypasses reads to RTC and DS3231 sensor
+
+    endchoice
+
+endmenu

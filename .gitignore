@@ -1,0 +1,12 @@
+sdkconfig
+sdkconfig.defaults
+sdkconfig.old
+.clangd
+managed_components/
+build/
+.vscode/
+CMakeCache.txt
+*.cmake
+*.bin
+*.exe
+/CMakeFiles
