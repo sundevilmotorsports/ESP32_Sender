@@ -4,7 +4,7 @@
 #include "esp_now.h"
 #include "esp_crc.h"
 
-#define ESPNOW_MAX_LENGTH 1500
+#define ESPNOW_MAX_LENGTH 200
 
 #define IS_BROADCAST_ADDR(addr) (memcmp(addr, s_broadcast_mac, ESP_NOW_ETH_ALEN) == 0)
 
@@ -49,11 +49,11 @@ typedef enum {
 } espnow_data_type_t;
 
 typedef struct __attribute__((packed)) {
-    espnow_msg_type_t type;
+    uint8_t  type;      // Message type (espnow_msg_type_t)
     uint16_t seq_num;   // Sequence number to keep track of messages
     uint16_t crc;       // CRC checksum for data integrity
-    size_t len;
-    uint8_t data[ESPNOW_MAX_LENGTH];   // Message content
+    uint8_t  len;       // Length of valid bytes in data[]
+    uint8_t  data[ESPNOW_MAX_LENGTH];   // Message content (200 bytes)
 } espnow_data_t;
 
 

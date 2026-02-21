@@ -1,11 +1,15 @@
 #include <stdio.h>
+#include <string.h>
 #include "can.h"
 #include "espnow.h"
 #include "driver/gpio.h"
 #include "nvs_flash.h"
 #include "esp_log.h"
+#include "esp_crc.h"
 #include "freertos/semphr.h"
 #include "esp_random.h"
+
+#define USE_REAL_DATA false
 
 #define SEND_INTERVAL_MS 50
 
@@ -26,6 +30,7 @@
 #define ID_SHIFTER      0x0F
 
 static const char *TAG = "SENDER_MAIN";
+static uint16_t s_seq_num = 0;
 
 uint8_t general[ESPNOW_MAX_LENGTH];
 size_t  general_len = 0;
@@ -35,6 +40,20 @@ uint8_t f0[3];
 uint8_t f1[3];
 uint8_t f2[3];
 
+static void send_general_packet(void) {
+    if (general_len == 0) return;
+    espnow_data_t pkt;
+    pkt.type    = (uint8_t)4; // Telemetry
+    pkt.seq_num = s_seq_num++;
+    pkt.crc     = 0;
+    pkt.len     = (uint8_t)(general_len > ESPNOW_MAX_LENGTH ? ESPNOW_MAX_LENGTH : general_len);
+    memcpy(pkt.data, general, pkt.len);
+    // CRC over header + data: type(1)+seq_num(2)+crc(2)+len(1)+data(len) = 6+len bytes
+    size_t total_size = 6 + pkt.len;
+    pkt.crc = esp_crc16_le(UINT16_MAX, (uint8_t const *)&pkt, total_size);
+    esp_now_send(s_broadcast_mac, (uint8_t *)&pkt, total_size);
+}
+
 void pack_general(uint8_t header_id, uint8_t *data, size_t len) {
     if (xSemaphoreTake(general_mutex, portMAX_DELAY)) {
         if ((general_len + 1 + len) < ESPNOW_MAX_LENGTH) {
@@ -42,9 +61,16 @@ void pack_general(uint8_t header_id, uint8_t *data, size_t len) {
             memcpy(&general[general_len], data, len);
             general_len += len;
         } else {
-            // trying to send cause obv general is full, could be problematic, check later
-            esp_now_send(s_broadcast_mac, general, general_len);
-        }   
+            // general is full — flush it first, then start fresh
+            send_general_packet();
+            general_len = 0;
+            memset(general, 0, ESPNOW_MAX_LENGTH);
+            if ((1 + len) < ESPNOW_MAX_LENGTH) {
+                general[general_len++] = header_id;
+                memcpy(&general[general_len], data, len);
+                general_len += len;
+            }
+        }
         xSemaphoreGive(general_mutex);
     }
 }
@@ -152,9 +178,9 @@ void clear_general_task(void *pvParameter) {
         vTaskDelay(pdMS_TO_TICKS(SEND_INTERVAL_MS));
         if (xSemaphoreTake(general_mutex, portMAX_DELAY)) {
             if (general_len > 0) {
-                esp_now_send(s_broadcast_mac, general, general_len); //broadcast rn
+                send_general_packet();
                 general_len = 0;
-                memset(general, 0, ESPNOW_MAX_LENGTH); // zero general out
+                memset(general, 0, ESPNOW_MAX_LENGTH);
             }
             xSemaphoreGive(general_mutex);
         }
@@ -204,7 +230,7 @@ void app_main(void)
     wifi_init();
     espnow_init();
     general_mutex = xSemaphoreCreateMutex();
-    #if CONFIG_USE_REAL_DATA
+    #if USE_REAL_DATA
         ESP_LOGI(TAG, "USING REAL DATA");
         can_init(process_can_message);
         xTaskCreate(clear_general_task, "clear general task", 4096, NULL, 5, NULL);

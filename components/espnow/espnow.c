@@ -131,11 +131,12 @@ static void espnow_send_ack_task(void *pvParameters) {
 
     while (1) {
         int payload_len = snprintf((char*)packet->data, sizeof(packet->data), "ACK; Seq Num: %lu", message_count);
-        packet->len = payload_len;
-        packet->type = ACK;
-        packet->seq_num = message_count++;
+        if (payload_len > 255) payload_len = 255;
+        packet->len = (uint8_t)payload_len;
+        packet->type = (uint8_t)ACK;
+        packet->seq_num = (uint16_t)(message_count++);
         packet->crc = 0;
-        size_t total_size = sizeof(espnow_data_t) - sizeof(packet->data) + packet->len;
+        size_t total_size = 6 + packet->len;
         packet->crc = esp_crc16_le(UINT16_MAX, (uint8_t const *)packet, total_size);
 
         if (esp_now_send(s_broadcast_mac, (uint8_t *)packet, total_size) != ESP_OK) {
