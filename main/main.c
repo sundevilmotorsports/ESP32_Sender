@@ -2,16 +2,15 @@
 #include <string.h>
 #include "can.h"
 #include "espnow.h"
-#include "driver/gpio.h"
 #include "nvs_flash.h"
 #include "esp_log.h"
 #include "esp_crc.h"
 #include "freertos/semphr.h"
 #include "esp_random.h"
 
-#define USE_REAL_DATA false
+#define USE_REAL_DATA true
 
-#define SEND_INTERVAL_MS 50
+#define SEND_INTERVAL_MS 20
 
 #define ID_DRS          0x01
 #define ID_IMU_GYRO     0x02
@@ -43,7 +42,7 @@ uint8_t f2[3];
 static void send_general_packet(void) {
     if (general_len == 0) return;
     espnow_data_t pkt;
-    pkt.type    = (uint8_t)4; // Telemetry
+    pkt.type    = (uint8_t)5; // Telemetry
     pkt.seq_num = s_seq_num++;
     pkt.crc     = 0;
     pkt.len     = (uint8_t)(general_len > ESPNOW_MAX_LENGTH ? ESPNOW_MAX_LENGTH : general_len);
@@ -170,6 +169,9 @@ static void process_can_message(twai_frame_t *message) {
             // }
             pack_general(ID_SHIFTER, data, 3);
             break;
+        default:
+            // ESP_LOGW(TAG, "Unknown can id");
+            pack_general((uint8_t)(message->header.id & 0xFF), data, message->header.dlc);
     }
 }
 

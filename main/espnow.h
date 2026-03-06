@@ -39,7 +39,8 @@ typedef struct {
 
 typedef enum {
     ACK,
-    REQUEST
+    REQUEST,
+    SET_LOGGER_FILE = 6
 } espnow_msg_type_t;
 
 typedef enum {

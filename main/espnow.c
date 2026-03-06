@@ -14,28 +14,22 @@
 #include <stdint.h>
 #include <ctype.h>
 #include <stdlib.h>
+#include "esp_twai.h"
+#include "can.h"
 
 #define ESPNOW_WIFI_MODE    WIFI_MODE_STA
 #define ESPNOW_WIFI_IF      ESP_IF_WIFI_STA
 #define ESPNOW_CHANNEL      1
-#define ACK_SEND_DELAY      CONFIG_ACK_SEND_DELAY
+#define ACK_SEND_DELAY      10000
 #define PAYLOAD_BUFFER_SIZE 50  // Max size of the data payload
 
-#define SEND_QUEUE_SIZE     CONFIG_SEND_QUEUE_SIZE
-#define RECV_QUEUE_SIZE     CONFIG_RECV_QUEUE_SIZE
+#define SEND_QUEUE_SIZE     100
+#define RECV_QUEUE_SIZE     100
 #define MAX_QUEUE_DELAY 512
 
-#if CONFIG_ESPNOW_ROLE_STATION
-    #define ESPNOW_WIFI_MODE WIFI_MODE_STA
-    #define ESPNOW_WIFI_IF   ESP_IF_WIFI_STA
-    #define ROLE             "STATION"
-    static const char *TAG = "ESPNOW_STATION";
-#else
-    #define ESPNOW_WIFI_MODE WIFI_MODE_STA
-    #define ESPNOW_WIFI_IF   ESP_IF_WIFI_STA
-    #define ROLE             "RECEIVER"
-    static const char *TAG = "ESPNOW_RECEIVER";
-#endif
+#define ESPNOW_WIFI_MODE WIFI_MODE_STA
+#define ESPNOW_WIFI_IF   ESP_IF_WIFI_STA
+static const char *TAG = "ESPNOW";
 
 static QueueHandle_t espnow_send_queue = NULL;
 static QueueHandle_t espnow_recv_queue = NULL;
@@ -187,6 +181,9 @@ static void espnow_recv_task(void *pvParameters) {
                 // }
                 printf("Received Message:  %.*s\n", packet->len, (char*)packet->data);
                 recv_seq++;
+            } else if (packet->type == SET_LOGGER_FILE) {
+                ESP_LOGI(TAG, "Setting logger file to %.*s\n", packet->len, (char*)packet->data);
+                can_send_frame(0x69E, packet->data, packet->len);
             } else {
                 ESP_LOGE(TAG, "INCORRECT PACKET TYPE DETECTED: %d", packet->type);
                 esp_now_deinit();
@@ -239,9 +236,7 @@ void espnow_init(void) {
     espnow_recv_queue = xQueueCreate(CONFIG_RECV_QUEUE_SIZE, sizeof(espnow_event_t));
 
     xTaskCreate(espnow_recv_task, "espnow_recv_task", 4096, NULL, 4, NULL);
-    if (strcmp(ROLE, "RECEIVER") == 0) {
-        xTaskCreate(espnow_send_ack_task, "espnow_send_ack_task", 4096, NULL, 4, NULL);
-    }
+    xTaskCreate(espnow_send_ack_task, "espnow_send_ack_task", 4096, NULL, 4, NULL);
 }
 
 void espnow_deinit(espnow_send_param_t *send_param) {

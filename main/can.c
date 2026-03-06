@@ -11,8 +11,8 @@ static const char *TAG = "CAN";
 #define BITRATE 1000000
 
 //Switched these, spotted a possible issue with schematic naming
-#define TX GPIO_NUM_4
-#define RX GPIO_NUM_18
+#define TX GPIO_NUM_6
+#define RX GPIO_NUM_4
 
 twai_node_handle_t hfdcan = NULL;
 
@@ -70,7 +70,8 @@ static void can_receive_task(void *pvParameters) {
                 .buffer = rx_frame.data,  // Now points to valid memory
                 .buffer_len = sizeof(rx_frame.data)
             };
-            
+           
+            //ESP_LOGI(TAG, "Recv Can");
             if (process != NULL) {
                 process(&processed_frame);  // ✅ SAFE
             }
@@ -88,7 +89,7 @@ void can_init(can_message_callback_t callback_function){
     // Create semaphore for RX notifications
     rx_sem = xSemaphoreCreateBinary();
 
-        // Configure TWAI node with ISR callback
+    // Configure TWAI node with ISR callback
     const twai_onchip_node_config_t can_config = {
         .io_cfg = {
             .tx = TX,
@@ -113,5 +114,35 @@ void can_init(can_message_callback_t callback_function){
         ESP_LOGE(TAG, "Failed to create can_receive_task");
         return;
     }
+}
 
+esp_err_t can_send_frame(uint32_t id, const uint8_t *data, uint8_t len) {
+    if (hfdcan == NULL) {
+        ESP_LOGE(TAG, "CAN node not initialized");
+        return ESP_ERR_INVALID_STATE;
+    }
+    if (len > 64) {
+        ESP_LOGE(TAG, "CAN frame data too long: %d", len);
+        return ESP_ERR_INVALID_ARG;
+    }
+
+    uint8_t tx_buff[64];
+    memcpy(tx_buff, data, len);
+
+    twai_frame_t tx_frame = {
+        .header = {
+            .id = id,
+            .ide = (id > 0x7FF) ? 1 : 0,  // Extended ID if > 11-bit range
+            .dlc = len,
+            .rtr = 0,
+        },
+        .buffer = tx_buff,
+        .buffer_len = sizeof(tx_buff),
+    };
+
+    esp_err_t ret = twai_node_transmit(hfdcan, &tx_frame, pdMS_TO_TICKS(100));
+    if (ret != ESP_OK) {
+        ESP_LOGE(TAG, "CAN transmit error: %s", esp_err_to_name(ret));
+    }
+    return ret;
 }

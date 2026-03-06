@@ -18,4 +18,5 @@ typedef void (*can_message_callback_t)(twai_frame_t *message);
 
 
 void can_init(can_message_callback_t callback_function);
+esp_err_t can_send_frame(uint32_t id, const uint8_t *data, uint8_t len);
 #endif
