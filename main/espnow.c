@@ -162,10 +162,10 @@ static void espnow_recv_task(void *pvParameters) {
                         vTaskDelete(NULL);
                     }
                     memset(peer, 0, sizeof(esp_now_peer_info_t));
-                    peer->channel = CONFIG_ESPNOW_CHANNEL;
+                    peer->channel = ESPNOW_CHANNEL;
                     peer->ifidx = ESPNOW_WIFI_IF;
                     peer->encrypt = false;
-                    memcpy(peer->lmk, CONFIG_ESPNOW_LMK, ESP_NOW_KEY_LEN);
+                    //memcpy(peer->lmk, ESPNOW_LMK, ESP_NOW_KEY_LEN);
                     memcpy(peer->peer_addr, recv_cb->mac_addr, ESP_NOW_ETH_ALEN);
                     ESP_ERROR_CHECK( esp_now_add_peer(peer) );
                     free(peer);
@@ -186,8 +186,6 @@ static void espnow_recv_task(void *pvParameters) {
                 can_send_frame(0x69E, packet->data, packet->len);
             } else {
                 ESP_LOGE(TAG, "INCORRECT PACKET TYPE DETECTED: %d", packet->type);
-                esp_now_deinit();
-                vTaskDelete(NULL);
             }
             if (recv_cb->data) {
                 free(recv_cb->data);
@@ -233,7 +231,7 @@ void espnow_init(void) {
     }
 
     memcpy(send_param->dest_mac, s_broadcast_mac, ESP_NOW_ETH_ALEN);
-    espnow_recv_queue = xQueueCreate(CONFIG_RECV_QUEUE_SIZE, sizeof(espnow_event_t));
+    espnow_recv_queue = xQueueCreate(RECV_QUEUE_SIZE, sizeof(espnow_event_t));
 
     xTaskCreate(espnow_recv_task, "espnow_recv_task", 4096, NULL, 4, NULL);
     xTaskCreate(espnow_send_ack_task, "espnow_send_ack_task", 4096, NULL, 4, NULL);
