@@ -58,8 +58,6 @@ static bool can_rx_cb(twai_node_handle_t handle, const twai_rx_done_event_data_t
 }
 
 static void can_receive_task(void *pvParameters) {
-
-    
     safe_can_frame_t rx_frame;
     
     while (1) {
@@ -71,7 +69,7 @@ static void can_receive_task(void *pvParameters) {
                 .buffer_len = sizeof(rx_frame.data)
             };
            
-            //ESP_LOGI(TAG, "Recv Can");
+            ESP_LOGI(TAG, "Recv Can: %d(%X) - %d", processed_frame.header.id, processed_frame.header.id, processed_frame.buffer[0]);
             if (process != NULL) {
                 process(&processed_frame);  // ✅ SAFE
             }
@@ -137,7 +135,7 @@ esp_err_t can_send_frame(uint32_t id, const uint8_t *data, uint8_t len) {
             .rtr = 0,
         },
         .buffer = tx_buff,
-        .buffer_len = sizeof(tx_buff),
+        .buffer_len = len,
     };
 
     esp_err_t ret = twai_node_transmit(hfdcan, &tx_frame, pdMS_TO_TICKS(100));
