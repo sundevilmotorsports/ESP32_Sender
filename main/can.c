@@ -11,8 +11,8 @@ static const char *TAG = "CAN";
 #define BITRATE 1000000
 
 //Switched these, spotted a possible issue with schematic naming
-#define TX GPIO_NUM_6
-#define RX GPIO_NUM_4
+#define TX GPIO_NUM_8
+#define RX GPIO_NUM_5
 
 twai_node_handle_t hfdcan = NULL;
 
@@ -69,9 +69,9 @@ static void can_receive_task(void *pvParameters) {
                 .buffer_len = sizeof(rx_frame.data)
             };
            
-            ESP_LOGI(TAG, "Recv Can: %d(%X) - %d", processed_frame.header.id, processed_frame.header.id, processed_frame.buffer[0]);
+            // ESP_LOGI(TAG, "Recv Can: %d(%X) - %d", processed_frame.header.id, processed_frame.header.id, processed_frame.buffer[0]);
             if (process != NULL) {
-                process(&processed_frame);  // ✅ SAFE
+                process(&processed_frame);
             }
         }
         

@@ -7,6 +7,8 @@
 #include "esp_crc.h"
 #include "freertos/semphr.h"
 #include "esp_random.h"
+#include "esp_timer.h"
+#include "driver/gpio.h"
 
 #define USE_REAL_DATA true
 
@@ -47,8 +49,14 @@
 #define OFFSET_SHIFTER   63   //  3 bytes
 #define TELEM_PACKET_SIZE 66
 
+#define USER_LED GPIO_NUM_4
+
+#define AMP_EN_PIN  GPIO_NUM_1
+#define AMP_EN      1
+
 static const char *TAG = "SENDER_MAIN";
 static uint16_t s_seq_num = 0;
+static int64_t can_msg_time = 0;
 
 static uint8_t telemetry_state[TELEM_PACKET_SIZE];
 static SemaphoreHandle_t state_mutex;
@@ -105,6 +113,7 @@ static void send_telemetry(void) {
 
 static void process_can_message(twai_frame_t *message) {
     uint8_t data[8];
+    can_msg_time = esp_timer_get_time() / 1000;
     memcpy(data, message->buffer, message->header.dlc);
     switch (message->header.id) {
         case 0x35F:
@@ -242,6 +251,14 @@ void app_main(void)
     wifi_init();
     espnow_init();
 
+    gpio_reset_pin(AMP_EN_PIN);
+    gpio_set_direction(AMP_EN_PIN, GPIO_MODE_OUTPUT);
+    gpio_set_level(AMP_EN_PIN, AMP_EN);
+
+    gpio_reset_pin(USER_LED);
+    gpio_set_direction(USER_LED, GPIO_MODE_OUTPUT);
+    gpio_set_level(USER_LED, 0);
+
     memset(telemetry_state, 0, sizeof(telemetry_state));
     state_mutex = xSemaphoreCreateMutex();
 
@@ -253,4 +270,13 @@ void app_main(void)
     xTaskCreate(fake_can_generator_task, "fake_can", 4096, NULL, 5, NULL);
 #endif
     xTaskCreate(send_telemetry_task, "send_telemetry", 4096, NULL, 5, NULL);
+    for(;;){
+        if(esp_timer_get_time() / 1000 - can_msg_time > 1){
+            gpio_set_level(USER_LED, 0);
+            // ESP_LOGW(TAG,"NO CAN IN LAST 100 MS");
+        } else {
+            gpio_set_level(USER_LED, 1);
+            // ESP_LOGI(TAG,"CAN RECIVED");
+        }
+    }
 }
